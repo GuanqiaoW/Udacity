@@ -1,0 +1,1021 @@
+---
+title: "ppdai-revision"
+author: "guanqiaowang"
+date: "6/11/2019"
+output:
+  html_document: default
+  pdf_document: default
+---
+# 拍拍数据分析 By Guanqiao Wang
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# load libraries
+library(ggplot2)
+```
+
+
+```{r}
+# display chinese correctly 
+options(scipen = 999)
+theme <- theme_get()
+theme$text$family <- "SimSun"
+theme_set(theme)
+```
+
+```{r echo=FALSE, Load_the_Data}
+# load data
+LCIS <-  read.csv(('LCIS.csv'))
+# backup dataset for further modification
+Copy_LCIS <- data.frame(LCIS)
+```
+
+
+# 评估数据
+
+### 总览数据
+
+通过R自带函数整体探索数据的总体结构，查看数据类型, 基础数据分布情况。在做EDA前确保数据质量和结构过关，如有必要，需要清理数据。
+
+```{r}
+names(Copy_LCIS)
+```
+
+```{r}
+str(Copy_LCIS)
+```
+
+```{r}
+summary(Copy_LCIS)
+```
+
+LCIS数据集中包含37个变量，292433行数据。 
+
+# 单变量绘图选择
+
+本小节主要探索研究单个变量的分布情况.
+
+### 清理数据
+
+通过上述步骤发现数据质量存在一定问题。如历史成功借款次数和历史成功借款金额的
+数据类型应为num而不是factor
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# remove duplicated records from dataset
+Copy_LCIS <- unique(Copy_LCIS)
+# convert data types
+Copy_LCIS$历史成功借款次数 <- as.numeric(as.character(Copy_LCIS$历史成功借款次数))
+Copy_LCIS$历史成功借款金额 <- as.numeric(as.character(Copy_LCIS$历史成功借款金额))
+# delelte  初始评级 and 借款类型 equal to NaN.
+Copy_LCIS$初始评级 <- na.omit(Copy_LCIS$初始评级)
+Copy_LCIS$借款类型 <- na.omit(Copy_LCIS$借款类型)
+```
+
+验证清理效果
+
+历史成功借款次数数据类型：
+
+```{r}
+# check data type 
+str(Copy_LCIS$历史成功借款次数)
+```
+
+历史成功借款金额数据类型：
+
+```{r}
+# check data type 
+str(Copy_LCIS$历史成功借款金额)
+```
+
+初始评级是否有Nan
+
+```{r}
+sum(is.nan(Copy_LCIS$初始评级))
+```
+
+借款类型是否有Nan
+
+```{r}
+sum(is.nan(Copy_LCIS$借款类型))
+```
+
+类型转换成功！
+
+
+### 自定义函数
+
+创建自定义函数模板为了减少重复代码，提高代码可读性。以下创建了四种常用的绘图。
+用户可自定义参数生成不同细节的绘图。
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# create a template of histogram plot
+create_histogram_plot <- function(varname, binwidth){
+  return (ggplot(data = Copy_LCIS, aes_string(x = varname)) + 
+  geom_histogram(binwidth = binwidth))
+}
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# create a template of bar plot
+create_bar_plot <- function(varname){
+  return (ggplot(data = Copy_LCIS, aes_string(x = varname)) + 
+  geom_bar())
+}
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# create a template of bar plot and the unit on y axis is percentage
+create_bar_plot_percent <- function(varname){
+  return (ggplot(data = Copy_LCIS, aes_string(x = varname)) + 
+  geom_bar(aes(y = (..count..)/sum(..count..))) + 
+    ylab("percentage"))
+}
+```
+
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# create a template of box plot
+create_box_plot <- function(varname,varname2){
+  return (ggplot(data = Copy_LCIS, aes_string(x = varname,y = varname2)) + 
+  geom_boxplot())
+}
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# create a template of box plot
+create_scatter_plot <- function(varname,varname2){
+  return (ggplot(data = Copy_LCIS, aes_string(x = varname,y = varname2)) + 
+  geom_point())
+}
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+create_scatter_plot_thr <- function(varname,varname2,color){
+  return (ggplot(data = Copy_LCIS, aes_string(x = varname,y = varname2,color = color)) + 
+  geom_point(alpha=1/5, position= "jitter"))
+  }
+```
+
+
+探索核心指标包括：
+
+1. 借款金额
+2. 借款利率
+
+探索辅助指标包括：
+
+1. 年龄
+2. 性别
+3. 历史成功借款金额
+4. 初始评级情况
+5. 我的投资金额
+6. 借款类型
+
+后期可根据分析需要，创建或者拆分出新的指标。
+
+### 借款金额分布
+
+```{r}
+summary(Copy_LCIS$借款金额)
+```
+
+```{r}
+outliers <- 1.5 * IQR(Copy_LCIS$借款金额) + 
+  summary(Copy_LCIS$借款金额)[["3rd Qu."]]
+outliers
+```
+
+通过计算得出借款金额的outlier在13000。借款金额直方图范围选址0~15000
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+create_histogram_plot('借款金额',500) +
+  ylab("数量") + 
+   scale_x_continuous(limits = c(0,15000), breaks = seq(0,15000,1000))
+```
+
+histgram plot参数：
+x: limit(0,15000), breaks(0,15000，1000)
+binwitdh: 500
+生成图像为右长尾。
+将x轴转化为log10，可能会生成更好的效果。
+
+### 借款金额条形图log10-scale
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(data = Copy_LCIS, aes(x = 借款金额) ) + 
+  geom_histogram() + 
+  ylab("数量") +
+   scale_x_log10()
+```
+
+将x转化为log之后，图像有原来的分散的多峰编程接近正态分布的图形，
+转化后的图像更好的帮助读者理解用户借款金额的分布情况。从借款金额分布图中可以看出，
+绝大多数借款金额都在10000元以下，其中5000元为最高频率借款金额。
+以上是全部用户综合借款分布情况。男性女性用户在借款需求方面有什么不同呐？
+
+## 总结借款利率
+
+通过summary()，table()和直方图探寻借款利率的数据分布情况。
+
+### 借款利率summary
+
+```{r}
+summary(Copy_LCIS$借款利率)
+```
+
+最小利率为7%，最大利率为24%。平均利率为17.78%。
+
+### 借款利率table
+
+```{r}
+table(Copy_LCIS$借款利率)
+```
+
+最常见的借款利率为18%,这一利率下的借款次数为97482人。利率保留小数点后两位，
+但为了不让刻度重合，提高可视化效果。binwidth选为1，利率范围选0~25范围。
+
+### 借款利率直方图
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+create_histogram_plot('借款利率',1) + 
+  scale_x_continuous(limits = c(0,25),breaks = seq(0,25,1))
+```
+
+绘图参数：
+x：limits(0,25), breaks(0,25,1)
+binwidth: 1
+
+从直方图图分布看，最常见利率为18%。
+
+### 性别分布
+
+```{r}
+create_bar_plot('性别')
+```
+
+通过条形图可粗略地看出男女用户比例为1：2。具体数据需要通过table()统计分析来确认。
+
+```{r}
+table(Copy_LCIS$性别)
+```
+
+table显示男性用户为190366，女性用户为102173.男性用户的数量接近与女性用户的2倍！
+
+### 我的投资金额
+
+```{r}
+create_histogram_plot('我的投资金额',50) + 
+  scale_x_continuous(breaks = seq(0,1500,100))
+```
+
+通过条形图可以看出，常见投资金额为50~100之间。
+
+## 总结初始评级情况
+
+### 初始评级table
+```{r}
+table(Copy_LCIS$初始评级)
+```
+
+通过查看table发现初始评共包含8类，B和C类级别的用户最常见。
+通过prop进一步查看用户比例。
+
+### 初始评级用户百分比table
+
+```{r}
+prop.table(table(Copy_LCIS$初始评级))
+```
+
+B类以上用户约占总用户数的30%
+B~C类用户约占总用户数的65%
+其他的非常见用户约占总用户数的5%
+
+### 初始评级直方图
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+create_bar_plot('初始评级') + ylab("数量")
+```
+
+用户初始评级共8个等级，B以上可视为优质信用客户。优质信用用户约占了百分之30%，
+绝大多数用户的信用等级在B~C之间, 最少的用户为AAA和F类用户。
+
+## 总结年龄分布
+
+### 年龄summary
+
+```{r}
+summary(Copy_LCIS$年龄)
+```
+
+用户年龄范围18~65，平均年龄在30左右。
+
+### 年龄table
+
+```{r}
+table(Copy_LCIS$年龄)
+```
+
+用户年龄集中在22~35，这一年龄范围的用户借款人数最多。
+
+### 年龄直方图
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+create_histogram_plot('年龄',5) + 
+  scale_x_continuous(breaks = seq(0,60,5))
+```
+
+绘图参数：
+x:breaks(0,60,5)
+binwidth:5
+
+年龄直方图接近正态分布,主要借款年龄分布在22~35之间。
+
+## 总结借款类型
+
+### 借款类型直方图
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+create_bar_plot('借款类型')
+```
+
+借款类型共5种类, 最少的类型为应收安全指标和电商类，最多为普通用户。
+
+### 借款类型table
+
+```{r}
+table(Copy_LCIS$借款类型)
+```
+
+### 借款类型百分比table
+
+```{r}
+prop.table(table(Copy_LCIS$借款类型))
+```
+
+应收安全标类用户占比不到1%, 电商类占比不到1.5%。
+
+
+### 我的投资金额直方图
+
+通过summary了解我的投资金额的大致范围情况。
+
+```{r}
+summary(Copy_LCIS$我的投资金额)
+```
+
+平均我的投资金额小于100, 数据主要分布集中在50~58之间。
+
+查看我的投资金额直方图的分布情况。
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(aes(x = 我的投资金额), data = Copy_LCIS) + 
+  geom_histogram(binwidth = 10) + 
+  ylab("数量") +
+  scale_x_continuous(limits=c(0,1000),breaks = seq(0,1000,50))
+```
+
+绘制直方图是选取参数：
+limit:(0,1000)
+breaks:(0,1000,50)
+binwidth: 10
+
+绝大多数用户的投资金额约在50左右。
+单从金额方面来看，拍拍贷用户的投资需求远低于借款需求。
+
+# 单变量分析
+
+### 你的数据集结构是什么？
+
+一共37个变量。
+ int变量数目：10
+ factor变量数目：6
+ num变量数目：21
+ 用户初始评级包含可七个等级，等级由高到地依次为：
+ AAA，AA，A，B，C，D，E，F
+ 借款类型包含5个不同类型，分别为：
+ APP闪电，其他，安全应收款，电商, 普通
+
+### 你的数据集内感兴趣的主要特性有哪些？
+
+感兴趣的主要特性为借款金额和借款利率。我期望发掘借款金额和借款利率与其他变量之间
+的线性关系，同时也需要探索其他变量之间的关系。希望最终建立一个预测贷款金额
+的预测模型。
+
+
+### 你认为数据集内哪些其他特征可以帮助你探索兴趣特点？
+初始评级,年龄,性别,借款利率, 历史成功借款金额,我的投资金额等特征可能有助于探索兴趣特点
+
+### 根据数据集内已有变量，你是否创建了任何新变量？
+没有创建新变量
+
+
+### 在已经探究的特性中，是否存在任何异常分布？你是否对数据进行一些操作，如清洁、调整或改变数据的形式？如果是，你为什么会这样做？
+数据需要清理, 首先去除重复数据。历史成功借款金额数据类型应该为num，不是factor。
+借款金额存在异常分布,绝大部分借款都是1.5万以下。在可视化显示时，
+限制y轴的取值范围即可,不必删除超出范围的数据。
+
+# 双变量绘图选择
+
+本小节主要探索研究2个变量之间的关系。根据变量之间的不同类型组合，
+将探索研究分3部分：
+1. 别类变量与别类变量
+2. 数字变量与别类变量
+3. 数字变量与数字字变量
+其中数字变量与数字字变量之间的关系需重点研究。
+利用散点图和灯箱图等可视化技术探索变量之间的关系,
+最终通过散点图和相关性计算发掘变量之间是否存在线性关系,
+为建立线性模型做准备。
+
+## 别类变量与别类变量
+
+以探索数字类变量包括：
+
+1. 性别
+2. 初始评级
+3. 借款类型
+
+将要探索的别类变量之间的关系：
+
+1. 性别 vs 初始评级
+2. 性别 vs 借款类型
+3. 初始评级 vs 借款类型
+
+
+### 性别 vs 初始评级
+
+查看不同性别下的初始评级情况。
+
+```{r}
+create_bar_plot_percent('初始评级') + 
+  facet_grid(~性别,ncol(2))
+```
+
+在两个性别中，B，C类的用户依旧是最常见用户。A类用户在男性中的占比多余女性用户。
+
+### 性别 vs 借款类型
+
+查看不同性别下借款类型情况。
+
+```{r}
+create_bar_plot_percent('借款类型') + 
+  facet_grid(~性别,ncol(2))
+```
+
+不同性别下，与其他类用户相比，应收安全指标和电商类用户依旧是最少的。这两类用户中，
+男性略高于女性。除应收安全指以外，女性用户中其他类用所占比例近似。男性用户中，
+普通用户居多，其实是其他类和APP善闪电。
+
+### 初始评级 vs 借款类型
+
+查看不同借款类型的用户初始评级。
+
+```{r}
+create_bar_plot('初始评级') + facet_grid(~借款类型,ncol(2))
+```
+
+应收安全标类用户中只存初始类型为AAA的类用户。电商类型用户多在B~C之间。APP闪电类型中，最常见的初始评级多为B类。
+
+## 数字变量与别类变量
+
+以探索数字类变量包括：
+
+1. 借款金额
+2. 借款利率
+3. 历史成功借款金额
+4. 我的投资金额
+5. 年龄
+其中年龄可为别类变量也可为数字变量。
+
+将要探索的数字类变量与别类变量之间的关系：
+
+1. 性别 vs 借款金额
+2. 初始评级 vs 借款金额 
+3. 借款类型 vs 借款金额
+4. 性别 vs 借款利率
+5. 初始评级 vs 借款利率
+6. 借款类型 vs 借款利率
+7. 性别 vs 我的投资金额
+8. 初始评级 vs 我的投资金额
+9. 借款类型 vs 我的投资金额
+7. 性别 vs 年龄
+8. 初始评级 vs 年龄
+9. 借款类型 vs 年龄
+
+### 性别 vs 借款金额
+
+查看不同性别下的用户借款金额分布。
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+create_box_plot('性别','借款金额') + 
+   coord_cartesian(ylim = c(0,20000)) +
+  ylab("数量")
+```
+
+不同性别下的借款金额的IQR大致形同，而女性的中位数略高于男性。
+
+### 初始评级 vs 借款金额 
+
+查看不同初始评级下的借款分布情况。
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+create_box_plot('初始评级','借款金额') + 
+  coord_cartesian(ylim = c(0,20000))
+```
+
+AA类用户中的Q1与中位数近似重合。
+由图可见AA类的用户借款金额IQR和Q2,Q3均小于其他类用户。
+有上述table可知，AA类用户占全部用户的20%, 但借款金额的需求远远小于其他用户。
+这种现象属于反常现象，还需进一步探究原因。初步猜测我的投资金额和历史成功借款金额
+会影响用户的初始评级。
+
+### 借款类型 vs 借款金额
+
+查看不同借款类型下的借款金分布情况.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+create_box_plot('借款类型','借款金额')
+```
+
+电商类用户借款金额比较突出。这类用户IQR,Q1,Q3位置的借款金额远远超过了其他类型用户的最大借款金额，其Q1位置的借款金额超过50000,其他类型用户的最大借款金额小于50000。与其他类用户相比，电商类的用户在借款金额方面数据特殊现象。 排除电商类的用户，其他类用户需设置借款金额范围单独进行分析。
+
+```{r}
+ggplot(subset(Copy_LCIS, 借款类型!="电商"),aes(x=借款类型,y=借款金额)) + 
+  geom_boxplot() +
+  coord_cartesian(ylim = c(0,20000))
+```
+
+绘图参数：
+ylim : (0,20000)
+
+由图可见，应收安全标的用户借款金额范围分布远远大于其他用户,其中位数金额超过10000, 
+而且他用户的中位数金额低于5000。
+
+### 性别 vs 借款利率
+
+不同性别下的借款利率分布情况。
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+create_box_plot('性别','借款利率') + 
+  scale_y_continuous(limits = c(0,25),breaks = seq(0,25,1))
+```
+
+女性用户的借款最低利率与中位数重合。男性用户用户利率IQR大于女性用户，但中位数和Q1,min小于女性用户的最低值。由此可见，男性有的借款门槛要低于女性用户。
+
+### 初始评级 vs 借款利率
+
+查看不同初始评级下的借款利率分布。
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+create_box_plot('初始评级','借款利率')
+```
+
+初始评级为A类(A,AA,AAA)的用户借款利率低于A类以下的用户。其中AAA用户借款利率最低，
+利率低于10%。A类用户的Q1，Q3重合，说明利率是相对恒定。其他用户的主流借款利率高均高于15%。
+
+### 借款类型 vs 借款利率
+
+查看不同借款类型下的借款利率分布。
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+create_box_plot('借款类型','借款利率')
+```
+
+普通类用户的主流借款利率范围大于其他用户。AAP闪电渠道的用户，Q1和Q3重合，
+说明这一渠道的用户借款利率恒定。 在研究上借款利率与初始评级的关系时发现，AAA用户的借款利率低于10%。
+而应收安全指标类的用户借款利率也低于10%。由此可以判断，安全指标类的用户的初始评级大多在AAA类。
+
+### 性别 vs 我的投资金额
+
+参看不同性别下我的投资金额分布情况
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+create_box_plot('性别','我的投资金额') 
+```
+
+图中无法显示具体信息，最大值和最小值重合。需要调整y的范围。
+在探究单变量时，我们发现我的投资金额常见范围集中在50~100之间。在绘制boxplot时候，
+金额的选区范围为0~100.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+create_box_plot('性别','我的投资金额') + coord_cartesian(ylim = c(0,100))
+```
+
+在不同性别的投资金额中，Q1与Q2重合。起始投资金额(Q1),男性用户IQR略大于女性用户。
+IQR和Q3均小于100, 所以用户主要进行小额投资。
+
+### 初始评级 vs 我的投资金额
+
+查看不同初始评级下的我的投资金额情况。
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+create_box_plot('初始评级','我的投资金额')
+```
+
+图中所示，AA类用的投资金额Q1,Q3和IQR远大于其他类用户，
+说明AA类用户在投资方面比其他用户更活跃。
+
+### 借款类型 vs 我的投资金额
+
+查看不同借款类型下的投资金额情况。
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+create_box_plot('借款类型','我的投资金额')
+```
+
+电商类用户的投资金额最大，其次是为普通类用户, 其他用户的投资金额范围非常固定。
+电商类用户Q2与Q3重合，说明金额小于Q2的投资居多。
+
+### 性别 vs 年龄
+
+查看不同性别下的年龄分布。
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+create_box_plot('性别','年龄')
+```
+
+不同性别下的年龄分布大致相同。
+
+### 初始评级 vs 年龄
+
+查看不同初始评级下的年龄分布。
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+create_box_plot('初始评级','年龄')
+```
+
+除AAA用户的主流年龄范围(IQR)略大，其他用户的主流年龄范围大致一直。B类用的中位数Q2略小于其他类用户。
+
+### 借款类型 vs 年龄
+
+查看不同借款类型下的年龄分布。
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+create_box_plot('借款类型','年龄')
+```
+
+不同借款类型用户的主流年龄范围在40岁以下。其中应收安全标的用户主流年龄超过30，而且他用户的主流年龄都低于30岁。
+
+## 数字变量与数字字变量
+
+将要探索的数字类变量之间的关系：
+
+1. 借款利率 vs 借款金额
+2. 历史成功借款金额 vs 借款金额
+
+### 借款利率 vs 借款金额
+
+借款金额和借款利率均为核心变量。尝试通过直接观察散点图的发掘两个变量之间是否存在
+线性关系，无可视化无法直接呈现线性关心，可以通过计算相关性或转化变量的方式探索
+变量之间的线性关系。
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+create_scatter_plot('借款利率','借款金额') + 
+  ggtitle("借款利率vs借款金额")
+```
+
+可视化图显示借款利率与借款金额之间无明显线性关系。
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+create_scatter_plot('借款利率','借款金额') +
+  scale_x_log10() + 
+  ggtitle("log(借款金额)vs借款利率")
+```
+
+通过观察散点图发现，log(借款金额)与借款利率之间无明显线性关系。
+
+### 计算相关性(借款利率 vs 借款金额)
+
+```{r}
+cor.test(Copy_LCIS$借款利率,Copy_LCIS$借款金额, method = 'pearson')
+```
+
+相关性强度范围:
+0~0.3    weak
+0.3~0.7  moderate
+0.7~1.0  Strong
+相关性计算结果为-0.09, 结果证明借款利率与借款金额之间无明显关联性。
+
+### 历史成功借款金额 vs 借款金额
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+create_scatter_plot('历史成功借款金额','借款金额') +
+  ggtitle("历史成功借款金额vs借款金额") 
+```
+
+通过观察散点图发现，数据点在x和y都小于10000的情况下，比较密集和集中，这部分数据可能
+隐藏这一些关系需要被挖掘。尝试将x和y转化为log(x)和log(y)进一步观察效果。
+
+### log(历史成功借款金额) vs log(借款金额)
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+create_scatter_plot('历史成功借款金额','借款金额') + 
+  scale_x_log10() + 
+  scale_y_log10() +
+  ggtitle("log(历史成功借款金额)vs log(借款金额)") + 
+  geom_smooth()
+```
+
+通过观察散点配合回归线图发现，x在100~10000范围，呈现出一条平缓的直线。
+当x大于10000时，呈现出45度的斜线。由此可见，log(历史成功借款金额)与log(借款金额)之间存在一定的心相关系。
+
+### 计算相关性(历史成功借款金额 vs 借款金额)
+
+```{r}
+cor.test(Copy_LCIS$历史成功借款金额,Copy_LCIS$借款金额, method = 'pearson')
+```
+
+相关性强度范围:
+0~0.3    weak
+0.3~0.7  moderate
+0.7~1.0  Strong
+
+计算想关性结果为0.475。由此可见，历史成功借款金额与借款金额之间存在适当的相关性。
+
+# 双变量分析
+
+### 探讨你在这部分探究中观察到的一些关系。这些感兴趣的特性与数据集内其他特性有什么区别？
+
+感兴趣的特性均为数字型变量，除我的投资金额和历史成功借款金额外，数据集内其他特性均为别类变量。
+
+### 你是否观察到主要特性与其他特性之间的有趣关系？
+
+<b>借款金额</b>与<b>借款利率</b>之间不存在明显的线性关系。其他变量之间也不存在线性关系。
+<b>借款金额</b>与<b>历史成功借款金额</b>之间存在适当的线性关系，相关值大于0.4。 借款金额随着历史成功借款金额增大而增大。
+
+### 你发现最强的关系是什么？
+
+<b>借款金额</b>与<b>历史成功借款金额</b>之间的线性关系最强，其值约为0.47.
+
+
+# 多变量绘图选择
+
+本小节主要探索研究多个变量之间的关系。利用颜色，图形，尺寸等方式区别不同别类变量下的趋势关系。
+
+
+### 借款利率 vs 借款金额 vs 性别
+
+查看不同性别下，借款利率与借款金额之间的关系。
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+create_scatter_plot_thr('借款利率','借款金额','性别') + 
+  ggtitle("借款利率 vs 借款金额 vs 性别")
+```
+
+有图可见，男性用户在数量和金额上均多余女性用户。
+
+### 借款利率 vs 借款金额 vs 初始评级
+
+查看不同初始评级下，借款利率与借款金额之间的关系。
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+create_scatter_plot_thr('借款利率','借款金额','初始评级') + 
+  scale_color_brewer(type = 'div') + 
+  scale_x_continuous(limits = c(0,25),breaks = seq(0,25,1)) +
+  ggtitle("借款利率 vs 借款金额 vs 初始评级")
+```
+
+有图可见，不同初始评级数据点成集中的区域性分布。例如A类初始评级的数据点集中在借款
+利率在13%和14%，形成了两条90度垂直的线。
+
+### 借款利率 vs 借款金额 vs 借款类型
+
+参看不同借款类型下借款利率与借款金额之间的关系。
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+create_scatter_plot_thr('借款利率','借款金额','借款类型') + 
+  scale_x_continuous(limits = c(0,25),breaks = seq(0,25,1)) +
+  scale_color_brewer(type = 'div') + 
+  ggtitle("借款利率 vs 借款金额 vs 借款类型")
+```
+
+有图可见，不同借款类型数据点成集中的区域性分布。电商类数据点占据散点图把部分位置。
+由此可看出，电商类用户的借款需求为主导，强于其他类用户。
+
+### 历史成功借款金额 vs 借款金额 vs 初始评级
+
+参看不同初始评级下历史成功借款金额与借款金额之间的关系。
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+create_scatter_plot_thr('历史成功借款金额','借款金额','初始评级')  + 
+  scale_color_brewer(type = 'div') + 
+  scale_x_log10() + 
+  scale_y_log10() +
+  ggtitle("历史成功借款金额 vs 借款金额 vs 初始评级") + 
+  geom_smooth()
+```
+
+图中根据不同的用户初始评级绘制出多条回归。出AA用户(倾向于投资)以外, 
+通过会回归线的斜率可以看出初始评级高的用户更容易借款。
+
+### 建立模型
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+library(memisc)
+
+m1 <- lm(I(借款金额) ~ I(历史成功借款金额), data = Copy_LCIS)
+m2 <- update(m1, ~ . + 借款利率)
+m3 <- update(m2, ~ . + 我的投资金额)
+m4 <- update(m3, ~ . + 初始评级)
+m5 <- update(m4, ~ . + 借款类型)
+m6 <- update(m5, ~ . + 性别)
+m7 <- update(m6, ~ . + 年龄)
+
+mtable(m1,m2,m3,m4,m5,m6,m7)
+```
+
+通过对比每个线性模型的R^2值发现我的投资金额，性别和年龄对借款金额无影响。利率对借款金额影响不大。而真正与借款金额影密切相关的数据是借款类型。
+
+### 模型优化
+
+```{r}
+m1_new <- lm(I(借款金额) ~ I(历史成功借款金额), data = Copy_LCIS)
+m2_new <- update(m1_new, ~ . + 借款类型)
+mtable(m1_new,m2_new)
+```
+
+为什么只有 R-squared 和 N？其他值不知道什么原因消失了! 
+
+```{r}
+m2_new
+```
+
+```{r}
+summary(m2_new)
+```
+
+```{r}
+coefficients(m2_new)
+```
+
+# 多变量分析
+
+### 探讨你在这部分探究中观察到的一些关系。通过观察感兴趣的特性，是否存在相互促进的特性？
+
+
+<b>历史成功贷款金额<b/>与<b>借款金额</b>之间存在相互促进的特征，
+2个变量之间存在强关联性。
+
+<b>借款利率<b/>与<b>借款金额<b/>之间不存在相互促进的特征, 
+2个变量之间存在弱关联性。
+
+### 这些特性之间是否存在有趣或惊人的联系呢？
+
+1. 当历史成功借款金额超过10000时，金额借款随着历史成功借款金额增大而增大。
+
+### 选项：你是否创建过数据集的任何模型？讨论你模型的优缺点。
+我创建模型为m2_new: lm(formula = I(借款金额) ~ I(历史成功借款金额) + 借款类型, data = Copy_LCIS)。
+借款金额为因变量，历史成功借款金额和借款类型为自变量，其中借款类型中包含多个子变量。通过观察之前的可视化和计算变量想关性发现,借款金额和历史成功借款金额之间存在适当的相关性。 但在对比R^2值后，历史成功借款金额在对借款金额影响很低，借款类型对借款金额的影响远高于历史成功借款金额。由于mtable无法正常显示adjusted R-squared值,导致无无法判断哪些无效的变量被增加。综上所述，这个模型的拟合度不是很理想。
+
+------
+
+# 定稿图与总结
+
+### 绘图一
+
+这部分通过直方图展示用户借款金额的分布情况。
+
+x轴未转换前的分布如下图:
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, Plot_one}
+create_histogram_plot('借款金额',100) + 
+  ylab("数量") + 
+  xlab("借款金额(元)") +
+   scale_x_continuous(limits = c(0,10000), breaks = seq(0,10000,500)) +
+   ggtitle("借款金额分布")
+```
+
+有图可见但数据的分布很分散，不利于观察和探索。所以需要将x轴转换，生成例如观察的图像。
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, Plot_one_part2}
+ggplot(data = Copy_LCIS, aes(x = 借款金额) ) + 
+  geom_histogram() + 
+   scale_x_log10() +
+   ylab("数量") +
+   xlab("借款金额(元)") +
+   ggtitle("借款金额分布 Base log10")
+```
+
+转换后的图像接近与正态分布。通过观察直方图可知，最长常见的借款范围在5000~10000之间。
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, Plot_one_part3}
+ggplot(data=Copy_LCIS,aes(y=借款金额)) + 
+  geom_boxplot() + 
+  scale_y_continuous(limits = c(0,20000),breaks = seq(0,20000,500)) +
+  ylab("借款金额(元)") +
+  ggtitle("借款金额极值分布情况")
+```
+
+通过灯箱图判断极值范围。超过1.5IQR为长尾需求。
+
+### 描述一
+
+常见借款金额在3000~6500，主流用户借款金额不超过10000。
+
+### 绘图二
+
+用户初始评级在一定程度上影响用户的借款金额和利率情况，需要进一步查看不同情况下的借款分布情况。
+选择使用灯箱图比较不同初始评级的借款金额分布。可视化图中需要站展示数据分布范围，极值以及平均值。
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, Plot_Two}
+create_box_plot('初始评级','借款金额') +
+  stat_summary(fun.y=mean, geom="point", shape=20, size=2, color="red", fill="red") +
+  scale_y_continuous(limits = c(0,20000),breaks = seq(0,20000,500)) +
+  coord_cartesian(ylim = c(0,20000)) + 
+  ylab("借款金额(元)") +
+  xlab("初始评级(A ~ F)") +
+  ggtitle("初始评级 vs 借款金额")
+```
+
+由图可见，AA类用户的IQR和中位数都比较小，而平均借款金额也小于其他用户。
+AA的用户借款需求不强烈。之前的研究历史成功借款金额与借款金额的关系证明了
+用户的历史借款金额是影响用户评级的一个因素。然而AA类用户借款需求明显小于其他用户，
+但是信用评级却很高。一定还存在其他的因素影响用户初始评级。
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, Plot_Two_part2}
+create_box_plot('初始评级','我的投资金额') +
+  stat_summary(fun.y=mean, geom="point", shape=20, size=2, color="red", fill="red") +
+  coord_cartesian(ylim = c(0,1000)) + 
+  scale_y_continuous(limits = c(0,1000),breaks = seq(0,1000,50)) +
+  ylab("我的投资金额(元)") +
+  xlab("初始评级(A ~ F)") +
+  ggtitle("初始评级 vs 我的投资金额")
+```
+
+通过分析不同初始评级下的我的投资金额分布发现，AA类的用户的IQR，Q1，Q2（中位数)，
+Q3以及平均数均高于其他类用户。由此推断，AA类用户的初始评级很高是由于其投资金额比较高。
+我的结论是：我的投资金额和借款金额为影响用户初始评级的因子。
+
+### 描述二
+
+原始数据集将用户按初始评级分为5类，大部分用户的初始评级在B与C之间。图1显示，AA类的用户借款金额范围远远低于B~C类用户！在借款金额需求小的情况下，初始评级还很高，其中可能还有其他因素影响用户初始评级。通过探索我的投资金额与初始评级的关系发现(图2)，AA类用户的投资金额以及范围远远大于其他类型用户。AA类用户更倾向于投资。其他类型的用户更倾向于借款。由此推断，我的投资金额为拍拍贷对用户初始信用评估一个因子！
+
+### 绘图三
+
+本小界主要证明用户的初始评级对其贷款金额和利率的影响。
+
+通过在原有的借款利率与借款金额的散点图中加入颜色元素来区分不同初始评级下的
+借款利率与借款金额的分布情况以及线性关系。
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, Plot_Three_part2}
+create_scatter_plot_thr('借款利率','借款金额','初始评级') +
+  scale_color_brewer(type = 'div') + 
+  scale_x_continuous(limits = c(0,25),breaks = seq(0,25,1)) +
+  scale_y_continuous(limits = c(0,100000),breaks = seq(0,100000,5000)) +
+  ylab("借款金额(元)") +
+  xlab("借款利率(%)") +
+  ggtitle("借款利率 vs 借款金额 vs 初始评级")
+```
+
+由图可见，整体的借款利率与借款金额之间不存在线性关系。借款金额不会随着借款金额的做有规律的变化。
+
+
+### 描述三
+
+借款利率和借款金额为主要感兴趣特征，但这两个变量之间不存在强相关性和线性关系。虽然整体情况下，
+借款利率与借款金额之间不存在规律，但在各自的初始评价下的借款利率和金额视乎存在一定的规律。
+A类用户的借款利率分布在13~14%之间，无论借款金额大小。AA类用户借款利率在10~12%，
+借款金额均小于20000。AAA类用户的利率主要分布在8~10%之间，借款金额小于10000.
+B，C类用户的利率在15~18%，无论金额大小。其他类用户的利率都大于等于20%。其中F类用户
+的利率在稳定在24%，但借款金额很小，低于10000。
+
+------
+
+# 反思
+
+对R语言的熟练程度限制了我的效率。如果换成用python做个项目，我可能会更快更会更深入的探索数据集。我对金融类的数据也不熟悉，理解变量的意义和用途花费了一些时间，由于理解错误，中间还有了一些弯路，做了许多无用功。最终通过浏览udacity论坛的帖子，帮助我解决了变量概念理解上的问题。由于之前没有仔细的做数据清理工作，我机会没发现变量之间存在强相关性。我感兴趣的特性之间相关性和弱，不足以建立相关模型，即使在通过变量运算创建新变量，新老之间变量也很难找出相关性较高的相互独立变量。再次仔细地清理数据后才返现，借款利率与历史成功借款金额之间存在一定的相关性。探索变量之间的关系花了我不少时间。在进行数据探索前，预先观察相关性矩阵才是一个明智的选择。观察相关性矩阵不仅提供数据探索的研究方向，还可以提高建模效率，避免浪费时间！建模过程比我想象的要复杂的多。虽然一些数据存在的相关性，但不被代表在建模过过程中会起到很大作用。对mtable，lm函数的用法和相关建模函数的作用也是一知半解。我还需还要花费更多的时间去学习建模的相关基础知识，逐渐地精进建模能力。本次项目考查范围是探索数据变量之间的关系，不涉及任何特征提取知识点。特征提取将用户合理地分类,更加精细地研究用户特征，可能更有助于挖掘有价值的信息。后期将尝试用机器学习模型对拍拍贷数据集进行挖掘，希望通过机器学习算法挖掘出显著和让人意想不到的结果。
+
+
+## Reference：
+
+https://blog.csdn.net/ada0915/article/details/79498419
+
+https://www.dummies.com/programming/r/how-to-add-calculated-fields-to-data-in-r/
+
+https://www.statmethods.net/management/reshape.html
+
+https://www.r-graph-gallery.com/269-ggplot2-boxplot-with-average-value/
+
+https://www.dummies.com/programming/r/how-to-convert-a-factor-in-r/
+
+http://www.dmstat1.com/res/TheCorrelationCoefficientDefined.html
+
+https://www.statmethods.net/management/subset.html
+
+https://stackoverflow.com/questions/43677853/error-in-lm-fitx-y-offset-offset-singular-ok-0-non-na-cases-with-boxcox?rq=1
+
+https://books.google.com/books?id=bvwVXHhNQ-4C&pg=PA203&lpg=PA203&dq=Error+in+lm.fit(x,+y,+offset+%3D+offset,+singular.ok+%3D+singular.ok,+...)+:+NA/NaN/Inf+in+%27x%27+++log&source=bl&ots=nsLB0jA9Rk&sig=ACfU3U081MryeGxVH4w-kv5vVGNxXnUnig&hl=en&sa=X&ved=2ahUKEwjomKbatK7jAhUgJTQIHd9zBQEQ6AEwA3oECAkQAQ#v=onepage&q=Error%20in%20lm.fit(x%2C%20y%2C%20offset%20%3D%20offset%2C%20singular.ok%20%3D%20singular.ok%2C%20...)%20%3A%20NA%2FNaN%2FInf%20in%20'x'%20%20%20log&f=false
+
+https://cran.r-project.org/web/packages/memisc/vignettes/mtable-html.html
+
+https://stackoverflow.com/questions/24198013/significance-of-i-keyword-in-lm-model-in-r
+
+https://blog.csdn.net/wwangfabei1989/article/details/80656668
+
+https://blog.csdn.net/xxzhangx/article/details/52924851
+
+
